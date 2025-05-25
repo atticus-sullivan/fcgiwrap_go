@@ -9,7 +9,6 @@ on:
     branches:
       - main
 
-
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -40,15 +39,11 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         run: |
           mkdir -p dist
-          go build -o dist/fcgiwrap-go
+          GOOS=linux GOARCH='amd64' go build -o dist/fcgiwrap-go-Linux-amd64
 
-      - name: Compress binary
-        if: ${{ steps.release.outputs.release_created }}
-        run: zip dist/fcgiwrap-go.zip dist/fcgiwrap-go
-
-      - name: Upload Release Artifact
+      - name: Upload Release Artifact (Binary)
         if: ${{ steps.release.outputs.release_created }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ steps.release.outputs.tag_name }} dist/fcgiwrap-go.zip
+          gh release upload ${{ steps.release.outputs.tag_name }} dist/fcgiwrap-go-Linux-amd64

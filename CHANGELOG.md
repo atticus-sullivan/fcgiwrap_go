@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 2025 Lukas Heindl
+
+SPDX-License-Identifier: MIT
+-->
+
 # Changelog
 
 ## 1.0.0 (2025-05-25)
