@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -153,13 +154,13 @@ func prepareCGICommand(env map[string]string, ctx context.Context) (*exec.Cmd, e
 }
 
 // fcgiHandler wraps handler to enforce limits and track active handlers
-func fcgiHandler(active *sync.WaitGroup, sem *semaphore.Weighted, refreshTimer func(), next http.Handler) http.Handler {
+func fcgiHandler(activeJobs *atomic.Int32, wg *sync.WaitGroup, sem *semaphore.Weighted, refreshTimer func(), next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// track active
-		active.Add(1)
-		defer active.Done()
-
-		refreshTimer()
+		wg.Add(1)
+		defer wg.Done()
+		activeJobs.Add(1)
+		defer activeJobs.Add(-1)
 
 		slog.Debug("waiting for worker slot")
 		if sem != nil {
@@ -172,7 +173,13 @@ func fcgiHandler(active *sync.WaitGroup, sem *semaphore.Weighted, refreshTimer f
 			}()
 		}
 
+		// refresh the timer AFTER accepting a new job
+		refreshTimer()
+
 		next.ServeHTTP(w, r)
+
+		// refresh the timer after finishing the job
+		refreshTimer()
 	})
 }
 
@@ -250,13 +257,14 @@ func main() {
 		timerReset = func() {}
 	}
 
-	wg := &sync.WaitGroup{}
+	var activeJobs atomic.Int32
+	var wg sync.WaitGroup
 	var sem *semaphore.Weighted
 	if args.Workers > 0 {
 		sem = semaphore.NewWeighted(int64(args.Workers))
 	}
 
-	h := fcgiHandler(wg, sem, timerReset, cgiResponder(args))
+	h := fcgiHandler(&activeJobs, &wg, sem, timerReset, cgiResponder(args))
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- fcgi.Serve(l, h)
@@ -265,21 +273,31 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	select {
-	case err := <-errCh:
-		if err != nil && !errors.Is(err, fcgi.ErrConnClosed) {
-			slog.Error("fcgi.Serve error", "error", err)
+loop:
+	for {
+		select {
+		case err := <-errCh:
+			if err != nil && !errors.Is(err, fcgi.ErrConnClosed) {
+				slog.Error("fcgi.Serve error", "error", err)
+			}
+			break loop
+		case <-sigCh:
+			slog.Info("shutdown signal received, waiting for active handlers")
+			break loop
+		case <-timerCh:
+			if activeJobs.Load() == 0 {
+				slog.Info("timeout reached and no active jobs")
+				break loop
+			} else {
+				slog.Debug("timeout fired but there are still active jobs — resetting timer")
+				timerReset()
+			}
 		}
-	case <-sigCh:
-		slog.Info("shutdown signal received, waiting for active handlers")
-	case <-timerCh:
-		slog.Info("timeout reached")
 	}
 
 	// terminate / cleanup
 	if l != nil {
 		// this should also make the serve function/goroutine terminate
-		// TODO how to when l is nil?
 		l.Close()
 	}
 
