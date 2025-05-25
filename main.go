@@ -159,13 +159,15 @@ func fcgiHandler(active *sync.WaitGroup, sem *semaphore.Weighted, refresh_timer 
 		refresh_timer()
 
 		slog.Debug("waiting for worker slot")
-		if err := sem.Acquire(context.TODO(), 1); err != nil {
-			slog.Error("Failed waiting for worker slot", "err", err)
-			return
+		if sem != nil {
+			if err := sem.Acquire(context.TODO(), 1); err != nil {
+				slog.Error("Failed waiting for worker slot", "err", err)
+				return
+			}
+			defer func(){
+				sem.Release(1)
+			}()
 		}
-		defer func(){
-			sem.Release(1)
-		}()
 
 		next.ServeHTTP(w, r)
 	})
@@ -247,7 +249,10 @@ func main() {
 	}
 
 	wg := &sync.WaitGroup{}
-	sem := semaphore.NewWeighted(int64(args.Workers))
+	var sem *semaphore.Weighted
+	if args.Workers > 0 {
+		sem = semaphore.NewWeighted(int64(args.Workers))
+	}
 
 	h := fcgiHandler(wg, sem, timer_reset, cgiResponder(args))
 	errCh := make(chan error, 1)
