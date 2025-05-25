@@ -149,6 +149,28 @@ func prepareCGICommand(env map[string]string, ctx context.Context, forwardErr bo
 	return cmd, nil
 }
 
+// fcgiHandler wraps handler to enforce limits and track active
+func fcgiHandler(active *sync.WaitGroup, sem *semaphore.Weighted, refresh_timer func(), next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// track active
+		active.Add(1)
+		defer active.Done()
+
+		refresh_timer()
+
+		slog.Debug("waiting for worker slot")
+		if err := sem.Acquire(context.TODO(), 1); err != nil {
+			slog.Error("Failed waiting for worker slot", "err", err)
+			return
+		}
+		defer func(){
+			sem.Release(1)
+		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // returns a http handler which handles the cgi request, executes the desired command and passes the response in the http response
 func cgiResponder(args arguments) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -199,7 +221,6 @@ func cgiResponder(args arguments) http.Handler {
 	})
 }
 
-
 func main() {
 	slog.SetDefault(setup_logger())
 
@@ -212,14 +233,23 @@ func main() {
 
 	var timer *time.Timer
 	var timer_ch <-chan time.Time
+	var timer_reset func()
 	if args.Timeout > 0 {
 		timer = time.NewTimer(time.Duration(args.Timeout) * time.Second)
 		timer_ch = timer.C
+		timer_reset = func(){
+			// TODO reed docs
+			timer.Reset(time.Duration(args.Timeout) * time.Second)
+		}
 	} else {
 		timer_ch = make(chan time.Time) // never fires
+		timer_reset = func(){}
 	}
 
-	h := cgiResponder(args)
+	wg := &sync.WaitGroup{}
+	sem := semaphore.NewWeighted(int64(args.Workers))
+
+	h := fcgiHandler(wg, sem, timer_reset, cgiResponder(args))
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- fcgi.Serve(l, h)
@@ -245,6 +275,15 @@ func main() {
 		// this should also make the serve function/goroutine terminate
 		// TODO how to when l is nil?
 		l.Close()
+	}
+
+	c := make(chan struct{})
+	go func() { wg.Wait(); close(c) }()
+	select {
+	case <-c:
+		slog.Info("all handlers completed")
+	case <-time.After(30*time.Second):
+		slog.Warn("timeout waiting for handlers to finish")
 	}
 
 	if sock_path != "" {
