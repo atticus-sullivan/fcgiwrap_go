@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 2025 Lukas Heindl
+//
+// SPDX-License-Identifier: MIT
+
 package main
 
 import (

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 2025 Lukas Heindl
+
+SPDX-License-Identifier: MIT
+-->
+
 # fcgiwrap_go
 
 `fcgiwrap_go` is a re-implementation of [the original `fcgiwrap`

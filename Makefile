@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 2025 Lukas Heindl
+#
+# SPDX-License-Identifier: MIT
+
 .PHONY: build cover test mod weight size
 
 build:

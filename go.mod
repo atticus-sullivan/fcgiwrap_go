@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 2025 Lukas Heindl
+//
+// SPDX-License-Identifier: MIT
+
 module fcgiwrap_go
 
 go 1.24.3
