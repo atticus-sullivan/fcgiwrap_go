@@ -9,19 +9,46 @@ on:
     branches:
       - main
 
+
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
+      issues: write
 
     steps:
-      - name: Release Please
-        uses: google-github-actions/release-please-action@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - uses: googleapis/release-please-action@v4
+        id: release
         with:
           release-type: go
-          package-name: fcgiwrap-go
-          default-branch: main
-          version-file: go.mod
-          initial-version: 0.1.0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build and upload only if a release was created
+      - name: Set up Go
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Go binary
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          mkdir -p dist
+          go build -o dist/fcgiwrap-go ./main.go
+
+      - name: Compress binary
+        if: ${{ steps.release.outputs.release_created }}
+        run: zip dist/fcgiwrap-go.zip dist/fcgiwrap-go
+
+      - name: Upload Release Artifact
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ steps.release.outputs.tag_name }} dist/fcgiwrap-go.zip
