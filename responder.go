@@ -56,4 +56,3 @@ func cgiResponder(args arguments) http.Handler {
 		}
 	})
 }
-

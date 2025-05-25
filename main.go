@@ -27,7 +27,7 @@ type arguments struct {
 // parse the arguments with go-arg. Uses MustParese -> might fail/panic
 func parseArgs() arguments {
 	args := arguments{
-		Workers: 1,
+		Workers:   1,
 		LogFormat: "json",
 	}
 	arg.MustParse(&args)

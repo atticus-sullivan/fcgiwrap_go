@@ -38,4 +38,3 @@ func fcgiHandler(activeJobs *atomic.Int32, wg *sync.WaitGroup, sem *semaphore.We
 		refreshTimer()
 	})
 }
-

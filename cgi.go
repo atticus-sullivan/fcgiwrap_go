@@ -79,4 +79,3 @@ func prepareCGICommand(env map[string]string, ctx context.Context) (*exec.Cmd, e
 
 	return cmd, nil
 }
-

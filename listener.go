@@ -42,4 +42,3 @@ func setupListener(sockArg string) (net.Listener, string, error) {
 
 	return l, socketPath, nil
 }
-

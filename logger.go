@@ -30,4 +30,3 @@ func setupLogger(format string) *slog.Logger {
 
 	return slog.New(handler)
 }
-
