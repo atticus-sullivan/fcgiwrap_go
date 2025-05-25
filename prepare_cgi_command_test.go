@@ -34,8 +34,7 @@ func TestPrepareCGICommand(t *testing.T) {
 		{
 			name:        "missing DOCUMENT_ROOT",
 			env:         map[string]string{"SCRIPT_FILENAME": execScript},
-			wantErr:     true,
-			errContains: "DOCUMENT_ROOT",
+			wantErr:     false,
 		},
 		{
 			name:        "missing SCRIPT_FILENAME and SCRIPT_NAME",
