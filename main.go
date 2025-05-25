@@ -31,7 +31,7 @@ type arguments struct {
 	ForwardErr bool   `arg:"-f,--forward-stderr" help:"Forward CGI stderr over FastCGI instead of host stderr"`
 }
 
-func parse_args() arguments {
+func parseArgs() arguments {
 	args := arguments{
 		Workers: 1,
 	}
@@ -39,7 +39,7 @@ func parse_args() arguments {
 	return args
 }
 
-func setup_logger() *slog.Logger {
+func setupLogger() *slog.Logger {
 	return slog.New(tint.NewHandler(os.Stderr, &tint.Options{
 		Level:      slog.LevelInfo,
 		TimeFormat: time.RFC3339,
@@ -47,75 +47,72 @@ func setup_logger() *slog.Logger {
 	}))
 }
 
-func setup_listener(sock_arg string) (net.Listener, string, error) {
+func setupListener(sockArg string) (net.Listener, string, error) {
 	var l net.Listener
-	var socket_path string
+	var socketPath string
 
 	var err error
-	if sock_arg == "" {
+	if sockArg == "" {
 		slog.Info("using stdin for FastCGI socket")
 		l = nil // stdin
-	} else if strings.HasPrefix(sock_arg, "unix:") {
-		path := sock_arg[len("unix:"):]
-		socket_path = path
+	} else if strings.HasPrefix(sockArg, "unix:") {
+		path := sockArg[len("unix:"):]
+		socketPath = path
 		_ = os.Remove(path)
 		l, err = net.Listen("unix", path)
 		if err != nil {
 			return nil, "", fmt.Errorf("listen unix on %v failed with %w", path, err)
 		}
 		slog.Info("listening on unix socket", "path", path)
-	} else if strings.HasPrefix(sock_arg, "tcp:") {
-		hp := sock_arg[len("tcp:"):]
+	} else if strings.HasPrefix(sockArg, "tcp:") {
+		hp := sockArg[len("tcp:"):]
 		l, err = net.Listen("tcp", hp)
 		if err != nil {
 			return nil, "", fmt.Errorf("listen tcp failed on port %v, with %w", hp, err)
 		}
 		slog.Info("listening on tcp socket", "hostport", hp)
 	} else {
-		return nil, "", fmt.Errorf("invalid socket URL '%v'", sock_arg)
+		return nil, "", fmt.Errorf("invalid socket URL '%v'", sockArg)
 	}
-	
-	return l, socket_path, nil
+
+	return l, socketPath, nil
 }
 
-
 // validateScript ensures the requested script path is under docRoot and is executable
-func validateScript(script, docRoot string) error {
-	// SCRIPT_FILENAME must be absolute
+func validateScript(script string, docRoot string) error {
 	if !filepath.IsAbs(script) {
-		return fmt.Errorf("SCRIPT_FILENAME must be absolute: %s", script)
+		return fmt.Errorf("script path must be absolute: %s", script)
 	}
 
 	// Clean up the path (removes "."/".." components)
-	clean := filepath.Clean(script)
+	script = filepath.Clean(script)
 
-	// Ensure clean path is under docRoot
-	rel, err := filepath.Rel(docRoot, clean)
+	// Ensure path is under docRoot
+	rel, err := filepath.Rel(docRoot, script)
 	if err != nil || strings.HasPrefix(rel, "..") {
-		return fmt.Errorf("SCRIPT_FILENAME outside DOCUMENT_ROOT (%s): %s", docRoot, clean)
+		return fmt.Errorf("script path (%s) outside DOCUMENT_ROOT (%s)", script, docRoot)
 	}
 
 	// Lstat file (does not follow symlink) to ensure target is a regular executable and no symlink
 	// symlink are the root of many vulnerabilities!
-	info, err := os.Lstat(clean)
+	info, err := os.Lstat(script)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("script not found: %w", err)
 		}
-		return fmt.Errorf("failed to stat script: %w", err)
+		return fmt.Errorf("failed to lstat script: %w", err)
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("Symlinks are unsupported %s", clean)
+		return fmt.Errorf("Symlinks are unsupported %s", script)
 	}
-
 	if !info.Mode().IsRegular() {
-		return fmt.Errorf("script is not a regular file: %s", clean)
+		return fmt.Errorf("script is not a regular file: %s", script)
 	}
 	if info.Mode().Perm()&0111 == 0 {
-		return fmt.Errorf("script not executable: %s", clean)
+		return fmt.Errorf("script not executable: %s", script)
 	}
 
-	slog.Debug("script validated", "script", clean)
+	slog.Debug("script validated", "script", script)
 	return nil
 }
 
@@ -128,12 +125,12 @@ func prepareCGICommand(env map[string]string, ctx context.Context, forwardErr bo
 		return nil, fmt.Errorf("DOCUMENT_ROOT not defined but needs to be")
 	}
 
-	script_name, ok := env["SCRIPT_NAME"]
-	if script == "" && (!ok || script_name == "") {
+	scriptName, ok := env["SCRIPT_NAME"]
+	if script == "" && (!ok || scriptName == "") {
 		return nil, fmt.Errorf("SCRIPT_NAME not defined but needs to be")
 	}
 	if script == "" {
-		script = filepath.Join(docRoot, script_name)
+		script = filepath.Join(docRoot, scriptName)
 	}
 
 	if err := validateScript(script, docRoot); err != nil {
@@ -150,13 +147,13 @@ func prepareCGICommand(env map[string]string, ctx context.Context, forwardErr bo
 }
 
 // fcgiHandler wraps handler to enforce limits and track active
-func fcgiHandler(active *sync.WaitGroup, sem *semaphore.Weighted, refresh_timer func(), next http.Handler) http.Handler {
+func fcgiHandler(active *sync.WaitGroup, sem *semaphore.Weighted, refreshTimer func(), next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// track active
 		active.Add(1)
 		defer active.Done()
 
-		refresh_timer()
+		refreshTimer()
 
 		slog.Debug("waiting for worker slot")
 		if sem != nil {
@@ -164,7 +161,7 @@ func fcgiHandler(active *sync.WaitGroup, sem *semaphore.Weighted, refresh_timer 
 				slog.Error("Failed waiting for worker slot", "err", err)
 				return
 			}
-			defer func(){
+			defer func() {
 				sem.Release(1)
 			}()
 		}
@@ -224,28 +221,28 @@ func cgiResponder(args arguments) http.Handler {
 }
 
 func main() {
-	slog.SetDefault(setup_logger())
+	slog.SetDefault(setupLogger())
 
-	args := parse_args()
-	l, sock_path, err := setup_listener(args.Socket)
+	args := parseArgs()
+	l, sockPath, err := setupListener(args.Socket)
 	if err != nil {
 		slog.Error("Initializing listener failed", "err", err)
 		panic(err)
 	}
 
 	var timer *time.Timer
-	var timer_ch <-chan time.Time
-	var timer_reset func()
+	var timerCh <-chan time.Time
+	var timerReset func()
 	if args.Timeout > 0 {
 		timer = time.NewTimer(time.Duration(args.Timeout) * time.Second)
-		timer_ch = timer.C
-		timer_reset = func(){
+		timerCh = timer.C
+		timerReset = func() {
 			// TODO reed docs
 			timer.Reset(time.Duration(args.Timeout) * time.Second)
 		}
 	} else {
-		timer_ch = make(chan time.Time) // never fires
-		timer_reset = func(){}
+		timerCh = make(chan time.Time) // never fires
+		timerReset = func() {}
 	}
 
 	wg := &sync.WaitGroup{}
@@ -254,7 +251,7 @@ func main() {
 		sem = semaphore.NewWeighted(int64(args.Workers))
 	}
 
-	h := fcgiHandler(wg, sem, timer_reset, cgiResponder(args))
+	h := fcgiHandler(wg, sem, timerReset, cgiResponder(args))
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- fcgi.Serve(l, h)
@@ -263,7 +260,6 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-
 	select {
 	case err := <-errCh:
 		if err != nil && !errors.Is(err, fcgi.ErrConnClosed) {
@@ -271,7 +267,7 @@ func main() {
 		}
 	case <-sigCh:
 		slog.Info("shutdown signal received, waiting for active handlers")
-	case <-timer_ch:
+	case <-timerCh:
 		slog.Info("timeout reached")
 	}
 
@@ -287,12 +283,12 @@ func main() {
 	select {
 	case <-c:
 		slog.Info("all handlers completed")
-	case <-time.After(30*time.Second):
+	case <-time.After(30 * time.Second):
 		slog.Warn("timeout waiting for handlers to finish")
 	}
 
-	if sock_path != "" {
-		_ = os.Remove(sock_path)
-		slog.Debug("removed unix socket", "path", sock_path)
+	if sockPath != "" {
+		_ = os.Remove(sockPath)
+		slog.Debug("removed unix socket", "path", sockPath)
 	}
 }
