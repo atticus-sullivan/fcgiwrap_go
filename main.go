@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
-	"path/filepath"
-	"io"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -13,12 +12,15 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/alexflint/go-arg"
 	"github.com/lmittmann/tint"
+	"golang.org/x/sync/semaphore"
 )
 
 // Args holds command-line arguments parsed by go-arg
@@ -119,15 +121,21 @@ func validateScript(script, docRoot string) error {
 
 // prepareCGICommand constructs an *exec.Cmd from the cgi request
 func prepareCGICommand(env map[string]string, ctx context.Context, forwardErr bool) (*exec.Cmd, error) {
+	script := env["SCRIPT_FILENAME"]
+
 	docRoot, ok := env["DOCUMENT_ROOT"]
-	if !ok || docRoot == "" {
-		return nil, fmt.Errorf("DOCUMENT_ROOT not defined")
+	if script == "" && (!ok || docRoot == "") {
+		return nil, fmt.Errorf("DOCUMENT_ROOT not defined but needs to be")
 	}
 
-	script, ok := env["SCRIPT_FILENAME"]
-	if !ok || script == "" {
-		return nil, fmt.Errorf("SCRIPT_FILENAME not defined")
+	script_name, ok := env["SCRIPT_NAME"]
+	if script == "" && (!ok || script_name == "") {
+		return nil, fmt.Errorf("SCRIPT_NAME not defined but needs to be")
 	}
+	if script == "" {
+		script = filepath.Join(docRoot, script_name)
+	}
+
 	if err := validateScript(script, docRoot); err != nil {
 		return nil, err
 	}
