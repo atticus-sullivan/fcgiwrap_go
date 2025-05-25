@@ -109,10 +109,12 @@ func validateScript(script string, docRoot string) error {
 	// Clean up the path (removes "."/".." components)
 	script = filepath.Clean(script)
 
-	// Ensure path is under docRoot
-	rel, err := filepath.Rel(docRoot, script)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return fmt.Errorf("script path (%s) outside DOCUMENT_ROOT (%s)", script, docRoot)
+	if docRoot != "" {
+		// Ensure path is under docRoot
+		rel, err := filepath.Rel(docRoot, script)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("script path (%s) outside DOCUMENT_ROOT (%s)", script, docRoot)
+		}
 	}
 
 	// Lstat file (does not follow symlink) to ensure target is a regular executable and no symlink
