@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2025 2025 Lukas Heindl
+#
+# SPDX-License-Identifier: MIT
+
+name: REUSE Compliance Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  reuse:
+    name: REUSE Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install reuse tool
+        run: |
+          sudo apt update
+          sudo apt install -y reuse
+
+      - name: Run reuse lint
+        run: reuse lint
