@@ -23,7 +23,7 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// Args holds command-line arguments parsed by go-arg
+// arguments holds command-line arguments parsed by go-arg
 type arguments struct {
 	Socket     string `arg:"-s,--socket" help:"Socket URL (tcp:host:port or unix:/path). Default: stdin"`
 	Timeout    int    `arg:"-t,--timeout" help:"Idle timeout in seconds; exit if no new request within this period"`
@@ -31,6 +31,7 @@ type arguments struct {
 	ForwardErr bool   `arg:"-f,--forward-stderr" help:"Forward CGI stderr over FastCGI instead of host stderr"`
 }
 
+// parse the arguments with go-arg. Uses MustParese -> might fail/panic
 func parseArgs() arguments {
 	args := arguments{
 		Workers: 1,
@@ -39,6 +40,7 @@ func parseArgs() arguments {
 	return args
 }
 
+// setup the logging options
 func setupLogger() *slog.Logger {
 	return slog.New(tint.NewHandler(os.Stderr, &tint.Options{
 		Level:      slog.LevelInfo,
@@ -47,6 +49,10 @@ func setupLogger() *slog.Logger {
 	}))
 }
 
+// generic function to setup a listener. Supports
+// - UNIX socket -> second return value is the file which should be deleted in the end
+// - TCP Socket
+// - nil/stdin
 func setupListener(sockArg string) (net.Listener, string, error) {
 	var l net.Listener
 	var socketPath string
@@ -146,7 +152,7 @@ func prepareCGICommand(env map[string]string, ctx context.Context) (*exec.Cmd, e
 	return cmd, nil
 }
 
-// fcgiHandler wraps handler to enforce limits and track active
+// fcgiHandler wraps handler to enforce limits and track active handlers
 func fcgiHandler(active *sync.WaitGroup, sem *semaphore.Weighted, refreshTimer func(), next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// track active
@@ -205,7 +211,6 @@ func cgiResponder(args arguments) http.Handler {
 		defer slog.Debug("CGI process finished", "pid", cmd.Process.Pid)
 
 		// proxy body
-
 		if _, err := io.Copy(stdin, r.Body); err != nil {
 			slog.Warn("error copying request body", "error", err)
 			cmd.Process.Kill()
@@ -221,9 +226,10 @@ func cgiResponder(args arguments) http.Handler {
 }
 
 func main() {
+	args := parseArgs()
+
 	slog.SetDefault(setupLogger())
 
-	args := parseArgs()
 	l, sockPath, err := setupListener(args.Socket)
 	if err != nil {
 		slog.Error("Initializing listener failed", "err", err)
@@ -290,4 +296,6 @@ func main() {
 		_ = os.Remove(sockPath)
 		slog.Debug("removed unix socket", "path", sockPath)
 	}
+
+	os.Exit(0) // should terminate/kill all remaining goroutines (particularly the serve goroutine if l=nil)
 }
