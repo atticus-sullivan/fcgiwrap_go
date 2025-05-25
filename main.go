@@ -30,24 +30,39 @@ type arguments struct {
 	Timeout    int    `arg:"-t,--timeout" help:"Idle timeout in seconds; exit if no new request within this period"`
 	Workers    int    `arg:"-w,--workers" help:"Max concurrent CGI handlers (default 1)"`
 	ForwardErr bool   `arg:"-f,--forward-stderr" help:"Forward CGI stderr over FastCGI instead of host stderr"`
+	LogFormat  string `arg:"--log-format" help:"Log format: 'json' (default) or 'test'"`
 }
 
 // parse the arguments with go-arg. Uses MustParese -> might fail/panic
 func parseArgs() arguments {
 	args := arguments{
 		Workers: 1,
+		LogFormat: "json",
 	}
 	arg.MustParse(&args)
 	return args
 }
 
 // setup the logging options
-func setupLogger() *slog.Logger {
-	return slog.New(tint.NewHandler(os.Stderr, &tint.Options{
-		Level:      slog.LevelInfo,
-		TimeFormat: time.RFC3339,
-		NoColor:    false,
-	}))
+func setupLogger(format string) *slog.Logger {
+	var handler slog.Handler
+
+	switch strings.ToLower(format) {
+	case "json":
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})
+	case "text":
+		fallthrough
+	default:
+		handler = tint.NewHandler(os.Stderr, &tint.Options{
+			Level:      slog.LevelInfo,
+			TimeFormat: time.RFC3339,
+			NoColor:    false,
+		})
+	}
+
+	return slog.New(handler)
 }
 
 // generic function to setup a listener. Supports
@@ -234,8 +249,8 @@ func cgiResponder(args arguments) http.Handler {
 
 func main() {
 	args := parseArgs()
-
-	slog.SetDefault(setupLogger())
+	slog.SetDefault(setupLogger(args.LogFormat))
+	slog.Info("starting fcgiwrap-go", "workers", args.Workers, "timeout", args.Timeout, "socket", args.Socket)
 
 	l, sockPath, err := setupListener(args.Socket)
 	if err != nil {
