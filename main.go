@@ -117,7 +117,7 @@ func validateScript(script string, docRoot string) error {
 }
 
 // prepareCGICommand constructs an *exec.Cmd from the cgi request
-func prepareCGICommand(env map[string]string, ctx context.Context, forwardErr bool) (*exec.Cmd, error) {
+func prepareCGICommand(env map[string]string, ctx context.Context) (*exec.Cmd, error) {
 	script := env["SCRIPT_FILENAME"]
 
 	docRoot, ok := env["DOCUMENT_ROOT"]
@@ -157,7 +157,7 @@ func fcgiHandler(active *sync.WaitGroup, sem *semaphore.Weighted, refreshTimer f
 
 		slog.Debug("waiting for worker slot")
 		if sem != nil {
-			if err := sem.Acquire(context.TODO(), 1); err != nil {
+			if err := sem.Acquire(r.Context(), 1); err != nil {
 				slog.Error("Failed waiting for worker slot", "err", err)
 				return
 			}
@@ -175,7 +175,7 @@ func cgiResponder(args arguments) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		env := fcgi.ProcessEnv(r)
 
-		cmd, err := prepareCGICommand(env, r.Context(), args.ForwardErr)
+		cmd, err := prepareCGICommand(env, r.Context())
 		if err != nil {
 			slog.Warn("preparing CGI command failed", "error", err)
 			http.Error(w, err.Error(), http.StatusForbidden)
@@ -237,7 +237,6 @@ func main() {
 		timer = time.NewTimer(time.Duration(args.Timeout) * time.Second)
 		timerCh = timer.C
 		timerReset = func() {
-			// TODO reed docs
 			timer.Reset(time.Duration(args.Timeout) * time.Second)
 		}
 	} else {
