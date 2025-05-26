@@ -6,6 +6,13 @@ SPDX-License-Identifier: MIT
 
 # Changelog
 
+## [1.2.0](https://github.com/atticus-sullivan/fcgiwrap_go/compare/v1.1.0...v1.2.0) (2025-05-26)
+
+
+### Features
+
+* normal cgi way of parsing http headers in the reply ([24471ae](https://github.com/atticus-sullivan/fcgiwrap_go/commit/24471ae54298555ed5cc81df7ef1bf4bc1c53652))
+
 ## [1.1.0](https://github.com/atticus-sullivan/fcgiwrap_go/compare/v1.0.1...v1.1.0) (2025-05-26)
 
 
