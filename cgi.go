@@ -62,11 +62,11 @@ func prepareCGICommand(env map[string]string, inherited_env []string, ctx contex
 		return nil, fmt.Errorf("DOCUMENT_ROOT not defined but needs to be")
 	}
 
-	scriptName, ok := env["SCRIPT_NAME"]
-	if script == "" && (!ok || scriptName == "") {
-		return nil, fmt.Errorf("SCRIPT_NAME not defined but needs to be")
-	}
 	if script == "" {
+		scriptName, ok := env["SCRIPT_NAME"]
+		if !ok || scriptName == "" {
+			return nil, fmt.Errorf("SCRIPT_NAME not defined but needs to be")
+		}
 		script = filepath.Join(docRoot, scriptName)
 	}
 
@@ -104,7 +104,3 @@ func inherit_environment(env map[string]string, inherited_env []string) []string
 
 	return ret_env
 }
-
-// TODO correlate with get_cgi_filename regarding errors if missing and PATH_INFO
-// HTTP(S) forbidden as var_name prefix for environment
-// TODO FCGI_CHDIR -> chdir before executing the script

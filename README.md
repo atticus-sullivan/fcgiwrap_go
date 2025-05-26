@@ -45,3 +45,6 @@ For adhoc testing, you can use
 ```bash
 SCRIPT_FILENAME=$PWD/test.sh REQUEST_METHOD=GET SERVER_PROTOCOL=HTTP/1.1 cgi-fcgi -connect ./test $PWD/test.sh
 ```
+
+## Differences
+- No handling/setting of the `PATH_INFO` environmenr variable
