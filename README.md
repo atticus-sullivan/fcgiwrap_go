@@ -48,3 +48,5 @@ SCRIPT_FILENAME=$PWD/test.sh REQUEST_METHOD=GET SERVER_PROTOCOL=HTTP/1.1 cgi-fcg
 
 ## Differences
 - No handling/setting of the `PATH_INFO` environmenr variable
+- For security reasons, symlinks generally are forbidden regarding executing scripts
+- Also `SCRIPT_FILENAME` needs to be an absolute path
