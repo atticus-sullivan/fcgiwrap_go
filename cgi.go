@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 )
-
 // validateScript ensures the requested script path is under docRoot and is executable
 func validateScript(script string, docRoot string) error {
 	if !filepath.IsAbs(script) {
@@ -55,7 +54,7 @@ func validateScript(script string, docRoot string) error {
 }
 
 // prepareCGICommand constructs an *exec.Cmd from the cgi request
-func prepareCGICommand(env map[string]string, ctx context.Context) (*exec.Cmd, error) {
+func prepareCGICommand(env map[string]string, inherited_env []string, ctx context.Context) (*exec.Cmd, error) {
 	script := env["SCRIPT_FILENAME"]
 
 	docRoot, ok := env["DOCUMENT_ROOT"]
@@ -76,10 +75,36 @@ func prepareCGICommand(env map[string]string, ctx context.Context) (*exec.Cmd, e
 	}
 
 	cmd := exec.CommandContext(ctx, script)
-	cmd.Env = os.Environ()
-	for k, v := range env {
-		cmd.Env = append(cmd.Env, k+"="+v)
-	}
+	cmd.Env = inherit_environment(env, inherited_env)
 
 	return cmd, nil
 }
+
+func inherit_environment(env map[string]string, inherited_env []string) []string {
+	ret_env := make([]string, 0, len(env)+len(inherited_env))
+	seen := make(map[string]bool)
+
+	for k,v := range env {
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		ret_env = append(ret_env, k+"="+v)
+		seen[k] = true
+	}
+
+	for _, i := range inherited_env {
+		tmp := strings.SplitN(i, "=", 2)
+		k,_ := tmp[0], tmp[1]
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		ret_env = append(ret_env, i)
+		seen[k] = true
+	}
+
+	return ret_env
+}
+
+// TODO correlate with get_cgi_filename regarding errors if missing and PATH_INFO
+// HTTP(S) forbidden as var_name prefix for environment
+// TODO FCGI_CHDIR -> chdir before executing the script

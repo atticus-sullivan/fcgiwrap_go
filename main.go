@@ -10,6 +10,7 @@ import (
 	"net/http/fcgi"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -38,10 +39,58 @@ func parseArgs() arguments {
 	return args
 }
 
+var forbidden_env_inherits map[string]bool = map[string]bool{
+	"AUTH_TYPE":         true,
+	"CONTENT_LENGTH":    true,
+	"CONTENT_TYPE":      true,
+	"GATEWAY_INTERFACE": true,
+	"PATH_INFO":         true,
+	"PATH_TRANSLATED":   true,
+	"QUERY_STRING":      true,
+	"REMOTE_ADDR":       true,
+	"REMOTE_HOST":       true,
+	"REMOTE_IDENT":      true,
+	"REMOTE_USER":       true,
+	"REQUEST_METHOD":    true,
+	"SCRIPT_NAME":       true,
+	"SERVER_NAME":       true,
+	"SERVER_PORT":       true,
+	"SERVER_PROTOCOL":   true,
+	"SERVER_SOFTWARE":   true,
+}
+
+func allowed_env_inherit(kv string) bool {
+	tmp := strings.SplitN(kv, "=", 2)
+	k,_ := tmp[0], tmp[1]
+
+	if strings.HasPrefix(k, "HTTP") {
+		return false
+	}
+
+	if _, ok := forbidden_env_inherits[k]; ok {
+		return false
+	}
+
+	return true
+}
+
+func setupEnv() []string {
+	env := os.Environ()
+	ret_env := make([]string, 0, len(env))
+	for _, e := range env {
+		if allowed_env_inherit(e) {
+			ret_env = append(ret_env, e)
+		}
+	}
+	return ret_env
+}
+
 func main() {
 	args := parseArgs()
 	slog.SetDefault(setupLogger(args.LogFormat))
 	slog.Info("starting fcgiwrap-go", "workers", args.Workers, "timeout", args.Timeout, "socket", args.Socket)
+
+	env := setupEnv()
 
 	l, sockPath, err := setupListener(args.Socket)
 	if err != nil {
@@ -70,7 +119,7 @@ func main() {
 		sem = semaphore.NewWeighted(int64(args.Workers))
 	}
 
-	h := fcgiHandler(&activeJobs, &wg, sem, timerReset, cgiResponder(args))
+	h := fcgiHandler(&activeJobs, &wg, sem, timerReset, cgiResponder(args, env))
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- fcgi.Serve(l, h)

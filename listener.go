@@ -15,6 +15,7 @@ import (
 // generic function to setup a listener. Supports
 // - UNIX socket -> second return value is the file which should be deleted in the end
 // - TCP Socket
+// - TODO tcp6 (supported by original tool)
 // - nil/stdin
 func setupListener(sockArg string) (net.Listener, string, error) {
 	var l net.Listener

@@ -73,7 +73,7 @@ func TestPrepareCGICommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, err := prepareCGICommand(tt.env, context.Background())
+			cmd, err := prepareCGICommand(tt.env, make([]string, 0), context.Background())
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errContains != "" {

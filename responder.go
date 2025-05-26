@@ -13,11 +13,11 @@ import (
 )
 
 // returns a http handler which handles the cgi request, executes the desired command and passes the response in the http response
-func cgiResponder(args arguments) http.Handler {
+func cgiResponder(args arguments, inherited_env []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		env := fcgi.ProcessEnv(r)
 
-		cmd, err := prepareCGICommand(env, r.Context())
+		cmd, err := prepareCGICommand(env, inherited_env, r.Context())
 		if err != nil {
 			slog.Warn("preparing CGI command failed", "error", err)
 			http.Error(w, err.Error(), http.StatusForbidden)
