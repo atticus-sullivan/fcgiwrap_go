@@ -77,6 +77,31 @@ func prepareCGICommand(env map[string]string, inherited_env []string, ctx contex
 	cmd := exec.CommandContext(ctx, script)
 	cmd.Env = inherit_environment(env, inherited_env)
 
+	if dir, ok := env["FCGI_CHDIR"]; ok {
+		switch dir {
+		case "-":
+		// explicit "-": skip chdir altogether
+		default:
+			// ensure it's absolute for clarity
+			if !filepath.IsAbs(dir) {
+				return nil, fmt.Errorf("FCGI_CHDIR must be absolute: %q", dir)
+			}
+			// stat it
+			info, err := os.Stat(dir)
+			if err != nil {
+				return nil, fmt.Errorf("FCGI_CHDIR stat failed: %w", err)
+			}
+			if !info.IsDir() {
+				return nil, fmt.Errorf("FCGI_CHDIR is not a directory: %q", dir)
+			}
+			// at this point we know chdir will succeed
+			cmd.Dir = dir
+		}
+	} else {
+		// fallback to script’s directory
+		cmd.Dir = filepath.Dir(script)
+	}
+
 	return cmd, nil
 }
 
