@@ -27,6 +27,7 @@ type arguments struct {
 	Workers    int    `arg:"-w,--workers" help:"Max concurrent CGI handlers (default 1)"`
 	ForwardErr bool   `arg:"-f,--forward-stderr" help:"Forward CGI stderr over FastCGI instead of host stderr"`
 	LogFormat  string `arg:"--log-format" help:"Log format: 'json' (default) or 'test'"`
+	LogLevel   string `arg:"--log-level" help:"Log level: 'info' (default), 'debug', 'warn' or 'error'"`
 }
 
 // parse the arguments with go-arg. Uses MustParese -> might fail/panic
@@ -97,7 +98,7 @@ func setupEnv() []string {
 
 func main() {
 	args := parseArgs()
-	slog.SetDefault(setupLogger(args.LogFormat))
+	slog.SetDefault(setupLogger(args.LogFormat, args.LogLevel))
 	slog.Info("starting fcgiwrap-go", "workers", args.Workers, "timeout", args.Timeout, "socket", args.Socket)
 
 	env := setupEnv()
