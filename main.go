@@ -57,6 +57,16 @@ var forbidden_env_inherits map[string]bool = map[string]bool{
 	"SERVER_PORT":       true,
 	"SERVER_PROTOCOL":   true,
 	"SERVER_SOFTWARE":   true,
+
+	"LD_PRELOAD":        true,
+	"LD_LIBRARY_PATH":   true,
+	"LD_AUDIT":          true,
+	"LD_DEBUG":          true,
+	"LD_DYNAMIC_WEAK":   true,
+	"LD_BIND_NOW":       true,
+	"LD_ORIGIN_PATH":    true,
+	"LD_ASSUME_KERNEL":  true,
+	"LD_CONFIG_FILE":    true,
 }
 
 func allowed_env_inherit(kv string) bool {
