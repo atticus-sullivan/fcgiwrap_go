@@ -6,6 +6,13 @@ SPDX-License-Identifier: MIT
 
 # Changelog
 
+## [1.3.0](https://github.com/atticus-sullivan/fcgiwrap_go/compare/v1.2.0...v1.3.0) (2025-05-26)
+
+
+### Features
+
+* make log level configurable ([4ae5f17](https://github.com/atticus-sullivan/fcgiwrap_go/commit/4ae5f17363ab50096dd8b78d68bb8dc985d8b518))
+
 ## [1.2.0](https://github.com/atticus-sullivan/fcgiwrap_go/compare/v1.1.0...v1.2.0) (2025-05-26)
 
 
