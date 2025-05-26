@@ -6,6 +6,15 @@ SPDX-License-Identifier: MIT
 
 # Changelog
 
+## [1.1.0](https://github.com/atticus-sullivan/fcgiwrap_go/compare/v1.0.1...v1.1.0) (2025-05-26)
+
+
+### Features
+
+* add more environmenr variables which should be blocked from inheriting ([4f33560](https://github.com/atticus-sullivan/fcgiwrap_go/commit/4f335602dbecb143cf841ddcff1545a7363539c2))
+* add support for FCGI_CHDIR ([b01ffba](https://github.com/atticus-sullivan/fcgiwrap_go/commit/b01ffbaa885ac4cd16e4f29c8b4e5ed58895bf06))
+* filter environment which gets inherited ([67f212e](https://github.com/atticus-sullivan/fcgiwrap_go/commit/67f212ebdb6ae321b106adbd7b8fa8da41fca78e))
+
 ## [1.0.1](https://github.com/atticus-sullivan/fcgiwrap_go/compare/v1.0.0...v1.0.1) (2025-05-25)
 
 
